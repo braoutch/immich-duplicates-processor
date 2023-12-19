@@ -83,7 +83,7 @@ class DuplicateRemover:
             # Use map() to process each element in parallel
             result = map(process_elem, self.immich_images_list)
 
-            use_next = False
+            use_next = True
 
             if use_next:
                 # Find the first element that satisfies the condition
