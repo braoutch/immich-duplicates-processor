@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from pillow_heif import register_heif_opener
 import argparse
+import time
 
 register_heif_opener()
 
@@ -37,16 +38,17 @@ def format_image(text):
 def main() -> int:
 
     already_done = {}
+    allow_progress_bar = True
 
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description='Immich duplicates detector')
 
     # Add three boolean arguments
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose')
-    parser.add_argument('-d', '--dry-run', action='store_true', help="Only create the result file, don't run the deletion process")
-    parser.add_argument('-l', '--delete-only', action='store_true', help='Only run the deletion process, from a already existing result file')
+    parser.add_argument('-d', '--dry-run', action='store_true', help='Only create the result file, don\'t run the deletion process')
+    parser.add_argument('-l', '--delete-only', action='store_true', help='Only run the deletion process, from an already existing result file')
     parser.add_argument('-r', '--restart', action='store_true', help='Clear hashes cache')
-    parser.add_argument('-s', '--similarity', type=int, help='Allowed similarity in %', default=95)
+    parser.add_argument('-s', '--similarity', type=int, default=95, help='define similarity percentage threshold (default is 95)')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -66,59 +68,74 @@ def main() -> int:
     print("Parameters:")
     print(args)
 
-    # exit(0)
-    # try:
-    #     with open("results.json", "r") as out_file:
-    #         already_done = json.load(out_file)
-    # except:
-    #     print("No previous results to load")
-
     #api = ImmichHandler("https://miaoutch.ddns.net/api", "UNOtlJYWmQHGAxq2AQ0CIY0qnlUAubjSZdlSZ6xAZM")
     api = ImmichHandler("http://192.168.50.214:2283/api", "UNOtlJYWmQHGAxq2AQ0CIY0qnlUAubjSZdlSZ6xAZM", verbose=verbose)
 
     # dn = DuplicateNameDetector()
     dr = DuplicateRemover(similarity=similarity, restart=restart, verbose=verbose)
+    loaded_list = dr.getWorkingList()
 
     if enable_detections:
+        error_list = {}
         counter = 0
         response_code, assets = api.getAllAssets()
         # assets = api.getAllAssetLocal()
         bar = progressbar.ProgressBar(maxval=len(assets), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.FormatLabel('Processed: %(value)d / ' + str(len(assets)) + ' lines (in: %(elapsed)s)')])
-        bar.start()
+        if allow_progress_bar:
+            bar.start()
         for asset in assets:
             counter = counter + 1
-            bar.update(counter)
+            
+            if allow_progress_bar:
+                bar.update(counter)
+                time.sleep(.05)
+            else:
+                print(counter, " / ", len(assets))
+
+            if asset["type"] != "IMAGE":
+                continue
+
             id = asset["id"]
             filename = asset['originalFileName']
 
-            if id in dr.getWorkingList():
+            if id in loaded_list:
+                if verbose:
+                    print("Skipping this id...")
                 continue
 
             if verbose:
                 print("Processing ID", id)
 
-
             status, response_code, image_path = api.downloadById(id, "./" + temp_dir + "/" + filename )
- 
+            if verbose:
+                print("File downloaded:", response_code)
+
             res = False
             if status is not True:
+                errors[id] = response_code
                 if verbose:
                     print(status, response_code, image_path, id, filename)
+    
             else:
                 res, compared_id = dr.find_duplicates_for_image(image_path, id)
-                if res is False:
-                    try:
-                        os.remove(image_path)
-                    except:
-                        if verbose:
-                            print("Unable to delete the image", image_path)
-                else:
+
+                try:
+                    os.remove(image_path)
+                except:
+                    if verbose:
+                        print("Unable to delete the image", image_path)
+
+                if res is True:
                     already_done[id] = compared_id
                     with open("results.json", "w") as out_file:
                         json.dump(already_done, out_file, indent=4)
 
-        bar.finish()
+        if allow_progress_bar:
+            bar.finish()
         print("Results saved to results.json")
+        print("Errors:", len(error_list))
+        with open("errors.json", "w") as out_file:
+            json.dump(error_list, out_file, indent=4)        
 
     if enable_delete:
         cv2.namedWindow("1")        # Create a named window

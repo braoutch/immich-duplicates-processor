@@ -44,7 +44,7 @@ class ImmichHandler:
             return json.load(file)
 
     def getAllAssets(self) -> dict:
-        endpoint = '/assets'
+        endpoint = '/asset'
         url = f'{self.base_url}{endpoint}'
         if self.verbose:
             print("Calling", url)
