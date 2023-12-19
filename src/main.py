@@ -112,7 +112,7 @@ def main() -> int:
 
             res = False
             if status is not True:
-                errors[id] = response_code
+                error_list[id] = response_code
                 if verbose:
                     print(status, response_code, image_path, id, filename)
     
