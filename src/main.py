@@ -92,16 +92,18 @@ def main() -> int:
             else:
                 print(counter, " / ", len(assets))
 
-            if asset["type"] != "IMAGE":
-                continue
-
             id = asset["id"]
-            filename = asset['originalFileName']
-
             if id in loaded_list:
                 if verbose:
                     print("Skipping this id...")
                 continue
+
+
+            if asset["type"] != "IMAGE":
+                continue
+
+            filename = asset['originalFileName']
+
 
             if verbose:
                 print("Processing ID", id)
@@ -118,6 +120,9 @@ def main() -> int:
     
             else:
                 res, compared_id = dr.find_duplicates_for_image(image_path, id)
+
+                if compared_id == -1:
+                    error_list[id] = response_code
 
                 try:
                     os.remove(image_path)
@@ -138,6 +143,11 @@ def main() -> int:
             json.dump(error_list, out_file, indent=4)        
 
     if enable_delete:
+
+        if not enable_detections:
+            with open("results.json", "r") as in_file:
+                already_done = json.load(in_file)
+
         cv2.namedWindow("1")        # Create a named window
         cv2.moveWindow("1", 0,0)  # Move it to (0,0)
         cv2.namedWindow("2")        # Create a named window
@@ -145,6 +155,10 @@ def main() -> int:
         bar = progressbar.ProgressBar(maxval=len(already_done), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
         bar.start()
         counter = 0
+
+        if verbose:
+            print("Candidates for deletion:", len(already_done))
+
         for elem in already_done:
             counter = counter + 1
             bar.update(counter)
