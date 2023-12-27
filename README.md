@@ -19,3 +19,5 @@ optional arguments:
 ```
 
 If you change the similarity, you must use `r`to recompute all hashes. Otherwise, there is a cache mecanism that can be convient if your library is very big and you want to stop the process and not restart from scratch.
+
+In the deletion process, you'll get both image candidates side by side. Press 1 to delete the one on the left, 2 for the one on the right, 3 for both, ESC to skip, or S to exit.
